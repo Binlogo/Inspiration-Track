@@ -97,32 +97,32 @@ self.timer = Repeater.every(.seconds(10), count: 5) { timer in
 * 单元测试设计
 
 ```swift
-	func test_timer_finiteAndRestart() {
-		let exp = expectation(description: "test_finiteAndRestart")
+func test_timer_finiteAndRestart() {
+  let exp = expectation(description: "test_finiteAndRestart")
 
-		var count: Int = 0
-		var finishedFirstTime: Bool = false
-		let timer = Repeater(interval: .seconds(0.5), mode: .finite(5)) { _ in
-			count += 1
-			print("Iteration #\(count)")
-		}
-		timer.onStateChanged = { (_, state) in
-			print("State changed: \(state)")
-			if state.isFinished {
-				if finishedFirstTime == false {
-					print("Now restart")
-					timer.start()
-					finishedFirstTime = true
-				} else {
-					exp.fulfill()
-				}
-			}
-		}
+  var count: Int = 0
+  var finishedFirstTime: Bool = false
+  let timer = Repeater(interval: .seconds(0.5), mode: .finite(5)) { _ in
+    count += 1
+    print("Iteration #\(count)")
+  }
+  timer.onStateChanged = { (_, state) in
+    print("State changed: \(state)")
+    if state.isFinished {
+      if finishedFirstTime == false {
+        print("Now restart")
+        timer.start()
+        finishedFirstTime = true
+      } else {
+        exp.fulfill()
+      }
+    }
+  }
 
-		timer.start()
+  timer.start()
 
-		wait(for: [exp], timeout: 30)
-	}
+  wait(for: [exp], timeout: 30)
+}
 ```
 
 单元测试输出：
@@ -156,7 +156,7 @@ Iteration #10
 State changed: finished
 ```
 
-可以看到，有限次的定时器在次数达到结束后，还可以继续调用 `start()` 重新开始再次复用。
+可以看到，有限次的定时器在次数达到结束后，还可以继续调用 `start()` 重新开始再次复用，而不必另外创建新实例。
 
 #### 创建无限重复定时器
 
@@ -187,18 +187,99 @@ let timer = Repeater.every(.seconds(5)) { timer in
 
 * 单元测试设计
 
-// TBD：10/14 - 11:52
+```swift
+func test_timer_infinite() {
+  let exp = expectation(description: "test_once")
+
+  var count: Int = 0
+  let timer = Repeater.every(.seconds(0.5), { _ in
+    count += 1
+    if count == 20 {
+      exp.fulfill()
+    }
+  })
+
+  print("Allocated timer \(timer)")
+  wait(for: [exp], timeout: 10)
+}
+```
+
+#### 源码探究：工厂类方法实现以及与 `Timer` 的异同
+
+通过以上接口的使用，发现以上三个工厂类方法生成的定时器都会「自动开始」，与 `Timer` 的工厂类方法相似：
+
+```swift
+/// Alternative API for timer creation with a block.
+/// - Experiment: This is a draft API currently under consideration for official import into Foundation as a suitable alternative to creation via selector
+/// - Note: Since this API is under consideration it may be either removed or revised in the near future
+/// - Warning: Capturing the timer or the owner of the timer inside of the block may cause retain cycles. Use with caution
+open class func scheduledTimer(withTimeInterval interval: TimeInterval, 
+                               repeats: Bool, 
+                               block: @escaping (Timer) -> Void) -> Timer {
+    let timer = Timer(fire: Date(timeIntervalSinceNow: interval), interval: interval, repeats: repeats, block: block)
+    CFRunLoopAddTimer(CFRunLoopGetCurrent(), timer._timer!, kCFRunLoopDefaultMode)
+    return timer
+}
+```
+
+👆Tips & Declaration： [Timer.swift](https://github.com/apple/swift-corelibs-foundation/blob/master/Foundation/Timer.swift#L68)，注释中有特别提醒注意循环引用的问题。
+
+对比一下 `Repeater` 的类工厂方法实现：
+
+```swift
+/// Create and schedule a timer that will call `handler` once after the specified time.
+///
+/// - Parameters:
+///   - interval: interval delay for single fire
+///   - queue: destination queue, if `nil` a new `DispatchQueue` is created automatically.
+///   - observer: handler to call when timer fires.
+/// - Returns: timer instance
+@discardableResult
+public class func once(after interval: Interval, 
+                       tolerance: DispatchTimeInterval = .nanoseconds(0), 
+                       queue: DispatchQueue? = nil, 
+                       _ observer: @escaping Observer) -> Repeater {
+      let timer = Repeater(interval: interval, mode: .once, tolerance: tolerance, queue: queue, observer: observer)
+  timer.start()
+  return timer
+}
+
+/// Create and schedule a timer that will fire every interval optionally by limiting the number of fires.
+///
+/// - Parameters:
+///   - interval: interval of fire
+///   - count: a non `nil` and > 0  value to limit the number of fire, `nil` to set it as infinite.
+///   - queue: destination queue, if `nil` a new `DispatchQueue` is created automatically.
+///   - handler: handler to call on fire
+/// - Returns: timer
+@discardableResult
+public class func every(_ interval: Interval, 
+                        count: Int? = nil, 
+                        tolerance: DispatchTimeInterval = .nanoseconds(0), 
+                        queue: DispatchQueue? = nil, 
+                        _ handler: @escaping Observer) -> Repeater {
+  let mode: Mode = (count != nil ? .finite(count!) : .infinite)
+      let timer = Repeater(interval: interval, mode: mode, tolerance: tolerance, queue: queue, observer: handler)
+  timer.start()
+  return timer
+}
+```
+
+两者的做法大相径庭，都是创建一个定时器实例并「自动开始」，只是开始的方式由于内部固有的实现方式有所不同：
+
+* `Timer` 依赖 `RunLoop`，需要将创建定时器生成的 `CFRunLoopTimer` 加入当前 `Runloop`
+* `Repeater` 依赖 GCD 的 `DispatchSourceTimer`，`start` 内部会调 `DispatchSourceTimer` 的 实例方法`resume`
+
+#### 手动管理计时器
 
 
 
-
-
-
+// TBD：10/15 - 07:08
 
 文件目录结构：
 
 ```sh
-./
+.
 ├── CHANGELOG.md
 ├── Configs
 │   ├── Repeat.plist
@@ -226,5 +307,11 @@ let timer = Repeater.every(.seconds(5)) { timer in
 
 
 ## 致谢与参考
+
+文中涉及源码大部分来自开源社区，以及部分其他文献参考。
+
+* [Repeat](https://github.com/malcommac/Repeat) by Daniele Margutti, under The MIT License (MIT)
+
+* [swift-corelibs-foundation](https://github.com/apple/swift-corelibs-foundation) Licensed under Apache License v2.0 with Runtime Library Exception
 
 * [A Background Repeating Timer in Swift](https://medium.com/over-engineering/a-background-repeating-timer-in-swift-412cecfd2ef9) by Daniel Galasko
