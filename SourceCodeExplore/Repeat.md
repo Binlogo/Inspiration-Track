@@ -28,7 +28,9 @@ Daniel 着重强调的一些特性：
 
 这两个特性对于用过 `RxSwift` 的开发者肯定不陌生，有了定时器，实现这两者也是顺理成章。
 
-## 接口的设计与使用
+
+
+## 接口的设计、使用与实现
 
 首先，从接口的设计来看看其是否「简洁明了」、「不冗余」，再逐步深入其内部实现。
 
@@ -204,9 +206,95 @@ func test_timer_infinite() {
 }
 ```
 
-#### 源码探究：工厂类方法实现以及与 `Timer` 的异同
 
-通过以上接口的使用，发现以上三个工厂类方法生成的定时器都会「自动开始」，与 `Timer` 的工厂类方法相似：
+
+#### 手动管理计时器
+
+* 接口设计与调用
+
+```swift
+log("当时只道是寻常")
+self.timer = Repeater(interval: .seconds(5), mode: .infinite) { _ in
+    // 每 5s 运行一次，直到 timer 生命周期结束
+    log("岁月如歌,简单爱一次")
+}
+timer.start()
+```
+
+输出：
+
+```shell
+2019-10-14 23:13:46 +0000: 当时只道是寻常
+2019-10-14 23:13:51 +0000: 岁月如歌,简单爱一次
+2019-10-14 23:13:56 +0000: 岁月如歌,简单爱一次
+2019-10-14 23:14:01 +0000: 岁月如歌,简单爱一次
+2019-10-14 23:14:06 +0000: 岁月如歌,简单爱一次
+2019-10-14 23:14:11 +0000: 岁月如歌,简单爱一次
+2019-10-14 23:14:16 +0000: 岁月如歌,简单爱一次
+2019-10-14 23:14:21 +0000: 岁月如歌,简单爱一次
+2019-10-14 23:14:26 +0000: 岁月如歌,简单爱一次
+...
+```
+
+其他方法：
+
+* `start()`: 开始一个已暂停或新创建的定时器
+* `pause()`：暂停一个正在运行的定时器
+* `reset(_ interval: Interval, restart: Bool)`：重置一个正在运行的定时器，更改时间间隔并重新开始
+* `fire()`：额外手动调用一次定时器绑定事件
+
+属性：
+
+* `.mode`：定时器类型模式
+  * `infinite`：无限定时重复
+  * `finite`：有限次定时重复
+  * `once`：单次定时执行
+* `.remainingIterations`：针对 `.finite` 有限次重复模式结束前的剩余迭代次数
+
+
+
+#### 添加或删除多个定时处理 TBD:  10/15 - 08:11
+
+
+
+## 源码探究
+
+接下来，进一步看看以上的接口都是如何实现的吧。
+
+### 文件目录结构
+
+```sh
+.
+├── CHANGELOG.md
+├── Configs
+│   ├── Repeat.plist
+│   └── RepeatTests.plist
+├── LICENSE
+├── Package.swift
+├── README.md
+├── Repeat.podspec
+├── Repeat.xcodeproj
+├── Sources
+│   └── Repeat
+│       ├── Debouncer.swift
+│       ├── Repeater.swift
+│       └── Throttler.swift
+└── Tests
+    ├── LinuxMain.swift
+    └── RepeatTests
+        └── RepeatTests.swift
+```
+
+主要文件：
+
+* Sources/Repeat/[Repeater.swift](https://github.com/malcommac/Repeat/blob/develop/Sources/Repeat/Repeater.swift)： 核心定时器实现
+* Sources/Repeat/[Debouncer.swift](https://github.com/malcommac/Repeat/blob/develop/Sources/Repeat/Debouncer.swift)： 扩展「防抖动器」实现
+* Sources/Repeat/[Throttler.swift](https://github.com/malcommac/Repeat/blob/develop/Sources/Repeat/Throttler.swift)： 扩展「节流阀」实现
+* Tests/RepeatTests/[RepeatTests.swift](https://github.com/malcommac/Repeat/blob/develop/Tests/RepeatTests/RepeatTests.swift)： 单元测试
+
+### 工厂类方法实现以及与 `Timer` 的异同
+
+在[接口设计与使用](#接口的设计、使用与实现)中可以看到，Repeater 提供了便捷工厂类方法，并且生成的定时器都会「自动开始」，与 `Timer` 的工厂类方法相似：
 
 ```swift
 /// Alternative API for timer creation with a block.
@@ -270,35 +358,11 @@ public class func every(_ interval: Interval,
 * `Timer` 依赖 `RunLoop`，需要将创建定时器生成的 `CFRunLoopTimer` 加入当前 `Runloop`
 * `Repeater` 依赖 GCD 的 `DispatchSourceTimer`，`start` 内部会调 `DispatchSourceTimer` 的 实例方法`resume`
 
-#### 手动管理计时器
 
 
+### TBD：10/15 - 07:36
 
-// TBD：10/15 - 07:08
 
-文件目录结构：
-
-```sh
-.
-├── CHANGELOG.md
-├── Configs
-│   ├── Repeat.plist
-│   └── RepeatTests.plist
-├── LICENSE
-├── Package.swift
-├── README.md
-├── Repeat.podspec
-├── Repeat.xcodeproj
-├── Sources
-│   └── Repeat
-│       ├── Debouncer.swift
-│       ├── Repeater.swift
-│       └── Throttler.swift
-└── Tests
-    ├── LinuxMain.swift
-    └── RepeatTests
-        └── RepeatTests.swift
-```
 
 ## 番外：NSTimer 的缺陷
 
