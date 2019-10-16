@@ -4,7 +4,7 @@
 
 ## 简介
 
-[Repeat](https://github.com/malcommac/Repeat) 是 *Daniele* 开发的一个基于 GCD - Grand Central Dispatch 的轻量定时器，可用于替代 `NSTimer`，解决其多项[不足](#番外 - NSTimer 的缺陷)。
+[Repeat](https://github.com/malcommac/Repeat) 是 *Daniele* 开发的一个基于 GCD - Grand Central Dispatch 的轻量定时器，可用于替代 `NSTimer`，解决其多项[不足](#TBD)。
 
 ## 特性
 
@@ -473,12 +473,6 @@ private func configureTimer() -> DispatchSourceTimer {
 这一段代码是 Repeat 中 GCD 的应用关键，Repeat 的核心计时器即是 DispatchSourceTimer，进一步封装并屏蔽部分复杂逻辑，以提供简洁易用的接口。
 
 // TBD
-
-
-
-## 番外 - NSTimer 的缺陷
-
-
 
 
 
