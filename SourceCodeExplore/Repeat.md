@@ -1,10 +1,10 @@
-# 探究 Repeat 中 GCD 的应用
+#  探究 Repeat 中 GCD 的应用
 
 > 这是小专栏《[彻底搞定 GCD🚦并发编程](https://xiaozhuanlan.com/complete-ios-gcd)》的一篇副产品文章
 
 ## 简介
 
-[Repeat](https://github.com/malcommac/Repeat) 是 *Daniele* 开发的一个基于 GCD - Grand Central Dispatch 的轻量定时器，可用于替代 `NSTimer`，解决其多项[不足](#番外：NSTimer 的缺陷)。
+[Repeat](https://github.com/malcommac/Repeat) 是 *Daniele* 开发的一个基于 GCD - Grand Central Dispatch 的轻量定时器，可用于替代 `NSTimer`，解决其多项[不足](#番外 - NSTimer 的缺陷)。
 
 ## 特性
 
@@ -253,7 +253,53 @@ timer.start()
 
 
 
-#### 添加或删除多个定时处理 TBD:  10/15 - 08:11
+#### 添加或移除多个定时处理
+
+一般而言，初始化定时器时会指定一个处理方法。除此之外， Repeat 的定时器还支持通过`observe()`额外添加处理方法，并且支持通过`token`再移除。
+
+```swift
+// 添加额外的处理监听
+let token = timber.observe { _ in
+	// 额外的新处理
+  log("一个闹钟能够同时叫醒相爱的两个人。")
+}
+timer.start()
+
+// 移除
+timer.remove(token)
+```
+
+
+
+#### 观察定时器的状态变化
+
+每个定时器维护着一个状态机，处在以下某个状态：
+
+* `.paused`：空闲（未被开始过）或已暂停
+* `.running`：正在计时中
+* `.executing`：注册的定时处理方法正在执行
+* `.finished`：计时结束
+
+可以通过`.onStateChanged`属性添加状态变化回调监听：
+
+```swift
+timer.onStateChanged = { timer, newState in
+    // 观察定时器状态变化并做相应处理
+    log("你永远叫不醒一个装睡的人")
+}
+```
+
+
+
+### 防抖动器
+
+*TBD*
+
+
+
+### 节流阀
+
+*TBD*
 
 
 
@@ -291,6 +337,12 @@ timer.start()
 * Sources/Repeat/[Debouncer.swift](https://github.com/malcommac/Repeat/blob/develop/Sources/Repeat/Debouncer.swift)： 扩展「防抖动器」实现
 * Sources/Repeat/[Throttler.swift](https://github.com/malcommac/Repeat/blob/develop/Sources/Repeat/Throttler.swift)： 扩展「节流阀」实现
 * Tests/RepeatTests/[RepeatTests.swift](https://github.com/malcommac/Repeat/blob/develop/Tests/RepeatTests/RepeatTests.swift)： 单元测试
+
+### 类图与方法概览
+
+// TBD: [配图]-UML 类图
+
+
 
 ### 工厂类方法实现以及与 `Timer` 的异同
 
@@ -360,11 +412,71 @@ public class func every(_ interval: Interval,
 
 
 
-### TBD：10/15 - 07:36
+### 初始化方法
+
+```swift
+/// Initialize a new timer.
+///
+/// - Parameters:
+///   - interval: interval of the timer
+///   - mode: mode of the timer
+///   - tolerance: tolerance of the timer, 0 is default.
+///   - queue: queue in which the timer should be executed; if `nil` a new queue is created automatically.
+///   - observer: observer
+public init(interval: Interval, mode: Mode = .infinite, tolerance: DispatchTimeInterval = .nanoseconds(0), queue: DispatchQueue? = nil, observer: @escaping Observer) {
+  self.mode = mode
+  self.interval = interval
+  self.tolerance = tolerance
+  self.remainingIterations = mode.countIterations
+  self.queue = (queue ?? DispatchQueue(label: "com.repeat.queue"))
+  self.timer = configureTimer()
+  self.observe(observer)
+}
+```
+
+初始化方法参数列表：
+
+* `interval`：定时器时间间隔
+* `mode`：定时器重复模式，默认为`.infinite`，无限重复
+* `tolerance`：容许误差（这个最终是作为`DispatchSourceTimer`的`leeway`参数）
+* `queue`：指定定时器运行的队列，若未指定，则自动创建默认队列
+* `observer`：定时器运行的回调方法
 
 
 
-## 番外：NSTimer 的缺陷
+#### 创建并配置 DispatchSourceTimer
+
+```swift
+private func configureTimer() -> DispatchSourceTimer {
+  let associatedQueue = (queue ?? DispatchQueue(label: "com.repeat.\(NSUUID().uuidString)"))
+  let timer = DispatchSource.makeTimerSource(queue: associatedQueue)
+  let repeatInterval = interval.value
+  let deadline: DispatchTime = (DispatchTime.now() + repeatInterval)
+  if self.mode.isRepeating {
+    timer.schedule(deadline: deadline, repeating: repeatInterval, leeway: tolerance)
+  } else {
+    timer.schedule(deadline: deadline, leeway: tolerance)
+  }
+
+  timer.setEventHandler { [weak self] in
+    if let unwrapped = self {
+      unwrapped.timeFired()
+    }
+  }
+  return timer
+}
+```
+
+* 根据初始化传入的参数，初始化并配置一个 DispatchSourceTimer
+* 将 DispatchSourceTimer 的处理回调通过`timeFired`方法i处理
+
+这一段代码是 Repeat 中 GCD 的应用关键，Repeat 的核心计时器即是 DispatchSourceTimer，进一步封装并屏蔽部分复杂逻辑，以提供简洁易用的接口。
+
+// TBD
+
+
+
+## 番外 - NSTimer 的缺陷
 
 
 
