@@ -468,11 +468,181 @@ private func configureTimer() -> DispatchSourceTimer {
 ```
 
 * 根据初始化传入的参数，初始化并配置一个 DispatchSourceTimer
-* 将 DispatchSourceTimer 的处理回调通过`timeFired`方法i处理
+* 将 DispatchSourceTimer 的处理回调通过`timeFired`方法处理
 
 这一段代码是 Repeat 中 GCD 的应用关键，Repeat 的核心计时器即是 DispatchSourceTimer，进一步封装并屏蔽部分复杂逻辑，以提供简洁易用的接口。
 
-// TBD
+
+
+### 计时器启动、暂停与重置
+
+```swift
+/// Reset the state of the timer, optionally changing the fire interval.
+///
+/// - Parameters:
+///   - interval: new fire interval; pass `nil` to keep the latest interval set.
+///   - restart: `true` to automatically restart the timer, `false` to keep it stopped after configuration.
+public func reset(_ interval: Interval?, restart: Bool = true) {
+  if self.state.isRunning {
+    self.setPause(from: self.state)
+  }
+
+  // For finite counter we want to also reset the repeat count
+  if case .finite(let count) = self.mode {
+    self.remainingIterations = count
+  }
+
+  // Create a new instance of timer configured
+  if let newInterval = interval {
+    self.interval = newInterval
+  } // update interval
+  self.destroyTimer()
+  self.timer = configureTimer()
+  self.state = .paused
+
+  if restart {
+    self.timer?.resume()
+    self.state = .running
+  }
+}
+
+/// Start timer. If timer is already running it does nothing.
+@discardableResult
+public func start() -> Bool {
+  guard self.state.isRunning == false else {
+    return false
+  }
+
+  // If timer has not finished its lifetime we want simply
+  // restart it from the current state.
+  guard self.state.isFinished == true else {
+    self.state = .running
+    self.timer?.resume()
+    return true
+  }
+
+  // Otherwise we need to reset the state based upon the mode
+  // and start it again.
+  self.reset(nil, restart: true)
+  return true
+}
+
+/// Pause a running timer. If timer is paused it does nothing.
+@discardableResult
+public func pause() -> Bool {
+  guard state != .paused && state != .finished else {
+    return false
+  }
+
+  return self.setPause(from: self.state)
+}
+
+/// Pause a running timer optionally changing the state with regard to the current state.
+///
+/// - Parameters:
+///   - from: the state which the timer should only be paused if it is the current state
+///   - to: the new state to change to if the timer is paused
+/// - Returns: `true` if timer is paused
+@discardableResult
+private func setPause(from currentState: State, to newState: State = .paused) -> Bool {
+  guard self.state == currentState else {
+    return false
+  }
+
+  self.timer?.suspend()
+  self.state = newState
+
+  return true
+}
+```
+
+* `start`方法主要是做状态判断并进行相应处理返回结果，其开始计时的核心是调用内部 `DispatchSourceTimer` 的 `resume` 方法
+* `pause` 方法类似，调用的是 `suspend` 方法，并更新内部计时器状态
+* `reset` 重置内部的一些计时标志位的同时，会将内部的 `DispatchSourceTimer` 销毁并新建
+
+
+
+### 添加或移除多个定时观察者
+
+```swift
+/// List of the observer of the timer
+private var observers = [ObserverToken: Observer]()
+
+/// Next token of the timer
+private var nextObserverID: UInt64 = 0
+
+/// Add new a listener to the timer.
+///
+/// - Parameter callback: callback to call for fire events.
+/// - Returns: token used to remove the handler
+@discardableResult
+public func observe(_ observer: @escaping Observer) -> ObserverToken {
+  var (new, overflow) = self.nextObserverID.addingReportingOverflow(1)
+  if overflow { // you need to add an incredible number of offset...sure you can't
+    self.nextObserverID = 0
+    new = 0
+  }
+  self.nextObserverID = new
+  self.observers[new] = observer
+  return new
+}
+
+/// Remove an observer of the timer.
+///
+/// - Parameter id: id of the observer to remove
+public func remove(observer identifier: ObserverToken) {
+  self.observers.removeValue(forKey: identifier)
+}
+```
+
+* 通过字典储存观察者回调事件，通过 UInt64 的 ObserverToken 来进行标识
+* 观察者数量上限控制在 UInt64 的溢出范围
+
+
+
+### 定时事件触发
+
+```swift
+/// Called when timer is fired
+private func timeFired() {
+  self.state = .executing
+
+  if case .finite = self.mode {
+    self.remainingIterations! -= 1
+  }
+
+  // dispatch to observers
+  self.observers.values.forEach { $0(self) }
+
+  // manage lifetime
+  switch self.mode {
+  case .once:
+    // once timer's lifetime is finished after the first fire
+    // you can reset it by calling `reset()` function.
+    self.setPause(from: .executing, to: .finished)
+  case .finite:
+    // for finite intervals we decrement the left iterations count...
+    if self.remainingIterations! == 0 {
+      // ...if left count is zero we just pause the timer and stop
+      self.setPause(from: .executing, to: .finished)
+    }
+  case .infinite:
+    // infinite timer does nothing special on the state machine
+    break
+  }
+
+}
+```
+
+* `timeFired` 方法被两个地方调用，一个是配置`DispatchSourceTimer`时设置的事件回调，一个是对外暴露的手动触发方法 `fire(andPause:)` 中
+* 根据计时模式更新计时器状态，计时模式的实现核心逻辑即在于此
+* 遍历所有观察者逐个回调，触发真正的计时器绑定事件
+
+
+
+## 总结
+
+![Repeat Mind Map](./assets/RepeatMindMap.png)
 
 
 
