@@ -340,9 +340,7 @@ timer.onStateChanged = { timer, newState in
 
 ### 类图与方法概览
 
-// TBD: [配图]-UML 类图
-
-
+![Repeat Class UML](./RepeatClassUML.jpg)
 
 ### 工厂类方法实现以及与 `Timer` 的异同
 
@@ -642,7 +640,7 @@ private func timeFired() {
 
 ## 总结
 
-![Repeat Mind Map](./assets/RepeatMindMap.png)
+![Repeat Mind Map](./RepeatMindMap.png)
 
 
 
