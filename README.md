@@ -1,6 +1,5 @@
-# Inspiration-Track
+# 彬少の原野
 记录工作与生活中的灵感💡与思考🤔
-
 
 
 ## 年度总结与计划
@@ -17,8 +16,6 @@
 
 * [去逃避，去忘记，直到无法呼吸？写在彷徨路口，2014 ❤ 年计划。](./ReflectionAndResolution/2013-2014.md)
 
-  
-
 ## 随笔
 
 * [莫怕少年穷——写在北大燕园](./Thoughts/20151031.md)
@@ -31,3 +28,4 @@
 ## 源码探究
 
 * [探究 Repeat 中 GCD 的应用](./SourceCodeExplore/Repeat/README.md)
+* [Yep 学习之旅 - Podfile 篇](./SourceCodeExplore/Yep/1_AboutPodfile.md)
