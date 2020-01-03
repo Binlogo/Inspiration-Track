@@ -36,3 +36,10 @@
 
 * [探究 Repeat 中 GCD 的应用](./SourceCodeExplore/Repeat/README.md)
 * [Yep 学习之旅 - Podfile 篇](./SourceCodeExplore/Yep/1_AboutPodfile.md)
+
+## 写作环境
+
+* [Markdown](http://support.typora.io/Markdown-Reference/) 编辑器采用 [Typora](https://www.typora.io/)
+* GitHub Pages 静态博客发布采用 [Gridea](https://gridea.dev/)
+* 大纲整理采用[幕布](https://mubu.com/inv/2026952)
+
