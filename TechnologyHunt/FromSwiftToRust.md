@@ -374,8 +374,12 @@ assert_eq!(result, 20);
 
 ```rust
 // rust
+for i in 0..5 {
+  	println!("{}", i);
+}
 ```
 
 
 
 ### 匹配
+
