@@ -4,6 +4,8 @@
 
 ## 年度总结与计划
 
+- [2020 改变再发生，2021 创造正当时](./ReflectionAndResolution/2020-2021.md)
+
 - [2019 造风蓄势，2020 扬帆起航](./ReflectionAndResolution/2019-2020.md)
 
 - [2018 助推，2019 沉淀](./ReflectionAndResolution/2018-2019.md)
