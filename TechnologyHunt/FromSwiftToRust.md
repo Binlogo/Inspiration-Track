@@ -1,3 +1,9 @@
+---
+title: From Swift to Rust
+date: 2022-05-01
+published: false
+---
+
 # From Swift to Rust
 
 Rust 和 Swift 一样都是现代化的年轻编程语言，语言特性上都借鉴了很多不同语言的优点，语法上有诸多相似的地方，不过诞生的背景和目标不一样，所以也有差异很大的地方，有着不同的应用场景。
